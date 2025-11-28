@@ -50,7 +50,28 @@ JGitkins Runner does not run a Docker daemon inside itself. Instead, it utilizes
 - [ ] **Resource Limits**: CPU/Memory constraints for build containers.
 
 
+## Tasks
+<!-- TASKS-TABLE:START -->
+
+| ID | Title | Status | Priority | Subtasks |
+| --- | --- | --- | --- | --- |
+| 1 | Feature Runner Integration with CLI | pending | high | 3 |
+| 2 | Feature Plugin Management | pending | medium | 3 |
+| 3 | Feature Workspace Sharing between Application's instance and executed docker's workspace | pending | medium | 0 |
+| 4 | Feature Job Consume Event | pending | medium | 0 |
+| 5 | Feature Concurrent Job Limitation | pending | high | 3 |
+
+<!-- TASKS-TABLE:END -->
+
+---
+
+## ❓ FAQ / Design Decisions
+
+**Q: How are plugins managed?**
+A: We aim to move away from the UI-based plugin management of traditional Jenkins. Plugins will be defined declaratively (Code-as-Configuration).
+
 <!-- #### 1. Runner Management
+
 - [ ] **Runner Registration API**: Logic to register this runner with the JGitkins Server (similar to GitLab Runner registration).
 
 #### 2. Pipeline & Plugin Management
@@ -60,10 +81,3 @@ JGitkins Runner does not run a Docker daemon inside itself. Instead, it utilizes
 
 #### 4. Integration
 - [ ] **Message Queue (MQ)**: Asynchronous communication with JGitkins Server for job distribution (Modular design). -->
-
----
-
-## ❓ FAQ / Design Decisions
-
-**Q: How are plugins managed?**
-A: We aim to move away from the UI-based plugin management of traditional Jenkins. Plugins will be defined declaratively (Code-as-Configuration).
