@@ -1,0 +1,12 @@
+### Planned Features (Roadmap)
+
+#### Integration
+- [ ] **CLI Support**: Command-line interface for easy setup and registration.
+
+#### Plugin Management
+- [ ] **YAML-based Plugin Management**: Define required Jenkins plugins in a `plugins.yaml` file to be pre-loaded.
+
+#### Related Execution
+- [ ] **Git Fetching**: Native ability to fetch git repositories upon receiving a trigger event. (such GitLab Runner)
+- [ ] **Resource Limits**: CPU/Memory constraints for build containers.
+

@@ -1,0 +1,152 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Feature Runner Integration with CLI",
+        "description": "Feature integration requires wiring a Picocli-driven `integrate` command under `src/main/java/io/jgitkins/runner/cli` so `java -jar build/libs/jgitkins-runner.jar integrate --server-url … --token … --label … --name …` boots only the lightweight context from `JGitkinsRunnerApplication.java`, validates args, invokes `{serverUrl}/runners/register` before the existing `/pipelines/run` flow in `src/main/java/io/jgitkins/runner/presentation/JobController.java`, and persists encrypted runner metadata to `~/.jgitkins-runner/config.yml` for future CLI/REST parity while mapping errors to `src/main/java/io/jgitkins/runner/domain/JobStatus.java` exit codes.",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "details": "- Feature command work lives in `src/main/java/io/jgitkins/runner/cli/IntegrateCommand.java` and a `RunnerCli` entrypoint that Picocli boots without the MVC stack; hook this CLI into `JGitkinsRunnerApplication.java` (or a `SpringApplicationBuilder` variant) so the Spring context starts with `WebApplicationType.NONE` and shuts down after the command completes.\n- Feature build updates go through `build.gradle`, adding Picocli plus `com.fasterxml.jackson.dataformat:jackson-dataformat-yaml` and Spring WebClient modules so the CLI can execute HTTP requests without the servlet container configured in `src/main/resources/application.yml`.\n- Feature service logic belongs to a Spring-managed `IntegrationService` in `src/main/java/io/jgitkins/runner/application/service` that uses `WebClient.Builder` to probe `{serverUrl}` (HEAD `/` or GET `/actuator/health`), POST a `RegisterRequest` payload to `{serverUrl}/runners/register`, applies retry/backoff, and emits SLF4J logs consistent with `DockerRunnerAdapter`.\n- Feature persistence mirrors the `Files.createDirectories` approach already used in `src/main/java/io/jgitkins/runner/infrastructure/git/GitWorkspaceService.java` to materialize `~/.jgitkins-runner/` before serializing YAML; encrypt tokens with a `SecretKeySpec` derived from an OS keyring env var, persist runner id/name/labels/serverUrl/masked token, and expose helpers to reload that YAML for subsequent CLI invocations.\n- Feature operator feedback sends progress/errors both through SLF4J and console output, including remediation hints when validation fails, when the WebClient ping/Register calls raise TLS/non-2xx errors, or when encryption/config writes fail.",
+        "testStrategy": "- Feature-level CLI coverage relies on `MockWebServer` plus Picocli’s `CommandLine` harness in `src/test/java/io/jgitkins/runner/cli/IntegrateCommandTest.java` to execute `integrate`, assert `/runners/register` payloads/headers, and inspect the generated YAML (using `@TempDir`) for encrypted tokens and metadata.\n- Feature validation specs should cover option parsing (missing `--server-url`, conflicting labels, malformed tokens) asserting exit codes map to `JobStatus` expectations and that the Spring context terminates without bringing up MVC beans.\n- Feature service tests in `src/test/java/io/jgitkins/runner/application/service` mock `WebClient` or use `MockWebServer` to drive connectivity failures, retry/backoff, and TLS issues before config persistence, ensuring clear exceptions bubble up and no writes touch the real home directory.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Wire integrate command into RunnerCli",
+            "description": "Feature wiring adds Picocli `IntegrateCommand` under `src/main/java/io/jgitkins/runner/cli`, exposes `--server-url/--token/--label/--name`, registers it with `RunnerCli`, and ensures `JGitkinsRunnerApplication.java` (or a `SpringApplicationBuilder` variant) boots with `WebApplicationType.NONE` so the CLI exits cleanly mapping failures to `JobStatus`.",
+            "dependencies": [],
+            "details": "Add Picocli + related dependencies in `build.gradle`, configure shutdown hooks so the minimal Spring context stops once the CLI command returns, and lazily fetch Spring beans so MVC controllers like `JobController` remain idle.",
+            "status": "pending",
+            "testStrategy": "Use Picocli’s `CommandLine` test harness to assert option parsing, duplicate label handling, and exit codes for validation errors while confirming the servlet container from `JGitkinsRunnerApplication` never spins up."
+          },
+          {
+            "id": 2,
+            "title": "Implement IntegrationService and config persistence",
+            "description": "Feature service layer lives in `IntegrationService` (`src/main/java/io/jgitkins/runner/application/service`) that probes `{serverUrl}` via `WebClient.Builder`, POSTs the runner payload to `/runners/register`, encrypts/decrypts tokens through a `SecretKeySpec` sourced from an env key, and writes the response to `~/.jgitkins-runner/config.yml` using YAML serialization.",
+            "dependencies": [],
+            "details": "Leverage `WebClient` from Spring WebFlux, reuse the `Files.createDirectories` pattern demonstrated in `GitWorkspaceService` to ensure the config directory exists, add `jackson-dataformat-yaml`/encryption helpers, and provide reload utilities so subsequent CLI commands ingest the stored runner id/name/labels/serverUrl.",
+            "status": "pending",
+            "testStrategy": "Mock `WebClient`/`MockWebServer` interactions (OK, 4xx/5xx, TLS failures) to verify ping + retry logic, and use temp directories to confirm encrypted YAML persistence without touching the actual home folder."
+          },
+          {
+            "id": 3,
+            "title": "Add integration tests",
+            "description": "Feature regression coverage backstops the CLI workflow with `MockWebServer` + Picocli tests verifying POST payloads, YAML contents (token encrypted), argument validation, and retry/backoff behavior spanning both `IntegrateCommand` and `IntegrationService`.",
+            "dependencies": [],
+            "details": "Create `IntegrateCommandTest` under `src/test/java/io/jgitkins/runner/cli` plus service-level suites in `src/test/java/io/jgitkins/runner/application/service`, using `@TempDir` (or `TemporaryFolder`) to isolate config writes from the real `~/.jgitkins-runner`.",
+            "status": "pending",
+            "testStrategy": "Combine Picocli command tests with `MockWebServer` assertions for HTTP calls and filesystem assertions checking encrypted metadata, and add mocked WebClient retries to guarantee errors bubble up with actionable remediation guidance."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Feature Plugin Management",
+        "description": "Add a first-class plugin management workflow so each runner profile can declare the Jenkins plugins required for a pipeline, persist those definitions in the CLI config, and ensure the Docker executor mounts the resolved bundle before calling the server.",
+        "status": "pending",
+        "dependencies": [
+          2
+        ],
+        "priority": "medium",
+        "details": "- Teach the CLI config loader to read/write a `plugins` section in `~/.jgitkins-runner/config.yml`, keep named bundles per profile, and expose Picocli flags that let `run` reference a specific `plugins.yaml` manifest.\n- Introduce a parser (e.g., `PluginBundleLoader` under `src/main/java/io/jgitkins/runner/infrastructure/plugins`) that reads the YAML, downloads/cache `.jpi` files, and mirrors Jenkinsfile Runner’s expected directory layout before execution.\n- Extend `JobExecuteRequest` (`src/main/java/io/jgitkins/runner/presentation/api/dto/JobExecuteRequest.java`) and related DTO/command objects so `/pipelines/run` can accept an optional plugin bundle identifier or manifest path; default to the active profile’s bundle.\n- Update `DockerRunnerAdapter.run` (`src/main/java/io/jgitkins/runner/infrastructure/adapter/DockerRunnerAdapter.java`) so the `Bind` list includes both the workspace and the resolved plugin volume (mount to `/usr/share/jenkins/ref/plugins` or configurable `runner.plugins.mountPath`).\n- Provide CLI subcommands such as `plugins list`, `plugins sync`, and `plugins use` to inspect/update bundles, persisting changes back to the YAML config alongside existing registration data.\n- Document plugin workflow in `README.md`, including how to author `plugins.yaml`, where bundles are cached, and how to override bundles per `run` invocation.\nPseudo:\n```\nPluginBundle bundle = pluginBundleLoader.load(activeProfile);\nBind plugins = new Bind(bundle.getPath(), new Volume(config.getPluginsMountPath()));\nCreateContainerResponse container = dockerClient.createContainerCmd(image)\n    .withBinds(workspaceBind, plugins)\n    .exec();\n```\n",
+        "testStrategy": "- CLI integration tests (Picocli + `@TempDir`) verifying `plugins list/run --plugins` updates `~/.jgitkins-runner/config.yml` and emits the correct manifest reference.\n- Unit tests for `PluginBundleLoader` covering YAML parsing, cache layout, and error handling when a plugin is missing.\n- `DockerRunnerAdapterTest` using mocks/spies to assert that `.withBinds(...)` receives both workspace and plugin mount paths.\n- REST/controller tests ensuring `/pipelines/run` accepts plugin bundle metadata and forwards it to `JobExecutionService` with the expected DTO changes.\n- README doctest or snapshot test (optional) validating that documented commands align with Picocli output.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Persist plugin bundles in CLI config",
+            "description": "Extend the config loader to add a `plugins` block with named bundles, expose CLI flags/subcommands to select and update bundles, and verify YAML read/write via tests.",
+            "dependencies": [],
+            "details": "/Users/alzar/task/sources/jgitkins/jgitkins-runner/src/main/java/io/jgitkins/runner infrastructure config loader pending",
+            "status": "pending",
+            "testStrategy": "Picocli integration test ensuring `plugins list` interacts with `@TempDir` config file."
+          },
+          {
+            "id": 2,
+            "title": "Bundle + mount plugins during execution",
+            "description": "Implement `PluginBundleLoader` to resolve manifests into directories and modify `DockerRunnerAdapter` to mount the bundle path (bind to `/usr/share/jenkins/ref/plugins`).",
+            "dependencies": [],
+            "details": "Touches PluginBundleLoader (new) and /Users/alzar/task/sources/jgitkins/jgitkins-runner/src/main/java/io/jgitkins/runner/infrastructure/adapter/DockerRunnerAdapter.java.",
+            "status": "pending",
+            "testStrategy": "Unit test verifying mount list includes plugin bind; bundle loader test covering YAML parsing."
+          },
+          {
+            "id": 3,
+            "title": "Propagate bundle metadata through API",
+            "description": "Add optional plugin fields to `JobExecuteRequest` and downstream command/service objects so `/pipelines/run` knows which bundle to mount, plus README updates.",
+            "dependencies": [],
+            "details": "/Users/alzar/task/sources/jgitkins/jgitkins-runner/src/main/java/io/jgitkins/runner/presentation/api/dto/JobExecuteRequest.java and JobExecutionService adjustments.",
+            "status": "pending",
+            "testStrategy": "Controller test confirming request payload with plugin info is validated and forwarded."
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Feature Workspace Sharing between Application's instance and executed docker's workspace",
+        "description": "Ensure the Jenkinsfile Runner container mounts the same host workspace prepared by `GitWorkspaceService` so the Spring Boot process and the container operate on identical files.",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "details": "- Extend `DockerRunnerAdapter` (`src/main/java/io/jgitkins/runner/infrastructure/adapter/DockerRunnerAdapter.java`) so `run(Path workspace, String image)` pulls a configurable container mount target (e.g., property `runner.workspace.containerPath`, default `/workspace`) and passes it through `HostConfig.withBinds(new Bind(workspace.toAbsolutePath().toString(), new Volume(containerPath)))` before `createContainerCmd(image)` to guarantee the Jenkinsfile Runner sees the exact files cloned by the Spring instance.\n- Surface the host workspace root already defined in `Constants.WORK_SPACE_ROOT` and returned from `GitWorkspaceService.prepareWorkspace(...)` so REST/CLI execution flows consistently hand the resolved `Path` into `DockerRunnerAdapter`, and emit structured logs confirming both host and container paths to simplify troubleshooting.\n- Allow executions that override the workspace location (e.g., via CLI/REST payload) to propagate through the adapter while still enforcing a shared bind mount, and document the behavior in the runner configuration so future mounts (plugins, caches) can reuse the same `HostConfig` wiring.\n- Add defensive checks ensuring the workspace exists before bind mounting, and surface actionable error messages when Docker cannot mount (e.g., permission issues) so operators know the Spring-side workspace is not being shared.\n",
+        "testStrategy": "- Add a unit test around `DockerRunnerAdapter` that stubs the Docker client and validates the `HostConfig` includes the bind from the host workspace (e.g., `/Users/.../TMP/<taskCd>/<repoName>`) to the configured container path.\n- Create a Testcontainers-backed integration test that uses `GitWorkspaceService` to prepare a temporary workspace, runs the Jenkinsfile Runner image through `DockerRunnerAdapter`, writes a sentinel file inside the container under `/workspace`, and asserts the file appears on the host path—proving the Spring application and container truly share the workspace.\n",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Feature Job Consume Event",
+        "description": "Expose API to receive trigger events and kick off fetch/execute flow automatically.",
+        "details": "- Create `TriggerController` (`/triggers/git`) accepting payload with repo URL, ref, task ID similar to GitLab Runner callbacks.\n- Validate signature/token header before processing.\n- Use `@Async` or message queue stub to call `GitWorkspaceService.fetchAndCheckout`, then if `autoExecute` true, reuse `JobExecuteUseCase` to start pipeline.\n- Provide CLI helper `runner listen` to poll server for triggers when webhooks unavailable.\nPseudo:\n```\n@PostMapping(\"/git\")\npublic ResponseEntity<Void> handle(@RequestBody TriggerPayload payload) {\n  workspaceService.fetchAndCheckout(...);\n  if (payload.execute()) jobExecuteUseCase.execute(cmd);\n}\n```\n- Update README for webhook configuration.",
+        "testStrategy": "Spring MVC test verifying auth + invocation order; integration test with in-memory repo ensuring fetch occurs before execution.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Feature Concurrent Job Limitation",
+        "description": "Introduce a configurable concurrency guard so the runner only executes a bounded number of jobs simultaneously, pulling defaults from `runner.concurrency` properties and optional CLI/API overrides while ensuring `JobController` and `JobExecutionService` enforce the limit before scheduling Docker workloads.",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "details": "- Add `RunnerConcurrencyProperties` under `src/main/java/io/jgitkins/runner/infrastructure/config` with fields like `maxParallelJobs`, `queueCapacity`, and `acquireTimeoutSeconds`, bound to `runner.concurrency` in `application.yml` and surfaced to the CLI config (`~/.jgitkins-runner/config.yml`) so future Picocli commands persist the defaults.\n- Implement a `ConcurrentJobLimiter` (e.g., wrapping a `Semaphore`) that lives in the application/service layer and exposes `tryAcquire(int requestedSlots)` / `release(int slots)`; inject it into `JobExecutionService` so concurrency is checked ahead of the existing workspace preparation + `ContainerRunnerPort.run(...)` call path found in `src/main/java/io/jgitkins/runner/application/service/JobExecutionService.java`.\n- Extend `JobExecuteRequest` and `JobExecuteCommand` (`src/main/java/io/jgitkins/runner/presentation/api/dto/JobExecuteRequest.java` and `src/main/java/io/jgitkins/runner/application/port/in/JobExecuteCommand.java`) with optional `concurrencySlots` or `exclusive` flags so REST callers can request stricter limits; ensure `JobController#runJob` maps these fields when building the command.\n- When the limiter cannot grant a permit, fail fast with a descriptive `ExecutionResult`/`JobStatus` (add a BUSY or RATE_LIMITED enum if needed) rather than starting the Docker work, and surface that result through `JobExecuteResponse`.\n- Provide YAML documentation/examples inside `README.md` for the new `runner.concurrency` block so ops teams know how to configure limits per profile (e.g., `runner.concurrency.max-parallel-jobs: 2`).",
+        "testStrategy": "- Create a Spring `@ConfigurationProperties` binding test covering `RunnerConcurrencyProperties` to confirm defaults and overrides from `application.yml` bind correctly.\n- Add focused unit tests for `ConcurrentJobLimiter` ensuring permits respect `maxParallelJobs`, timeouts behave as expected, and permits are released even when `JobExecutionService` throws.\n- Extend `JobExecutionService` unit tests (or new concurrency-focused tests) to verify it returns an error/`JobStatus.BUSY` when the limiter denies additional jobs, mocking `ContainerRunnerPort` to ensure no Docker invocation occurs beyond the cap.\n- Update controller tests for `JobController#runJob` to validate payloads with/without the new concurrency fields bind and propagate properly.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add RunnerConcurrencyProperties configuration",
+            "description": "Create `RunnerConcurrencyProperties` bound to `runner.concurrency` with sane defaults, reference it from `JGitkinsRunnerApplication` (or a config class), and document the YAML structure in `README.md`.",
+            "dependencies": [],
+            "details": "Expose fields for `maxParallelJobs`, `queueCapacity`, and `acquireTimeoutSeconds`, and ensure CLI config persistence mirrors these values.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 2,
+            "title": "Implement concurrency limiter behavior in JobExecutionService",
+            "description": "Introduce a `ConcurrentJobLimiter` that guards `JobExecutionService.execute` so no more than the configured number of jobs run concurrently, returning an error when the limit is hit.",
+            "dependencies": [],
+            "details": "Acquire permits before workspace prep and `ContainerRunnerPort.run(...)`, release them in `finally`, and map limiter failures to a new `JobStatus` value surfaced through `JobExecuteResponse`.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 3,
+            "title": "Expose concurrency overrides via API/CLI contracts",
+            "description": "Add optional fields (e.g., `concurrencySlots`, `exclusive`) to `JobExecuteRequest`, `JobExecuteCommand`, and related CLI config so specific runs can request exclusive execution or more than one slot, defaulting from `RunnerConcurrencyProperties`.",
+            "dependencies": [],
+            "details": "Wire new fields through `JobController` builders and persist CLI defaults in `~/.jgitkins-runner/config.yml` for parity with REST.",
+            "status": "pending",
+            "testStrategy": null
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-11-28T05:56:43.411Z",
+      "updated": "2025-11-28T05:56:43.411Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
