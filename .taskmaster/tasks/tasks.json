@@ -2,7 +2,7 @@
   "master": {
     "tasks": [
       {
-        "id": 1,
+        "id": "1",
         "title": "Feature Runner Integration with CLI",
         "description": "Feature integration requires wiring a Picocli-driven `integrate` command under `src/main/java/io/jgitkins/runner/cli` so `java -jar build/libs/jgitkins-runner.jar integrate --server-url … --token … --label … --name …` boots only the lightweight context from `JGitkinsRunnerApplication.java`, validates args, invokes `{serverUrl}/runners/register` before the existing `/pipelines/run` flow in `src/main/java/io/jgitkins/runner/presentation/JobController.java`, and persists encrypted runner metadata to `~/.jgitkins-runner/config.yml` for future CLI/REST parity while mapping errors to `src/main/java/io/jgitkins/runner/domain/JobStatus.java` exit codes.",
         "status": "pending",
@@ -18,7 +18,8 @@
             "dependencies": [],
             "details": "Add Picocli + related dependencies in `build.gradle`, configure shutdown hooks so the minimal Spring context stops once the CLI command returns, and lazily fetch Spring beans so MVC controllers like `JobController` remain idle.",
             "status": "pending",
-            "testStrategy": "Use Picocli’s `CommandLine` test harness to assert option parsing, duplicate label handling, and exit codes for validation errors while confirming the servlet container from `JGitkinsRunnerApplication` never spins up."
+            "testStrategy": "Use Picocli’s `CommandLine` test harness to assert option parsing, duplicate label handling, and exit codes for validation errors while confirming the servlet container from `JGitkinsRunnerApplication` never spins up.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -27,7 +28,8 @@
             "dependencies": [],
             "details": "Leverage `WebClient` from Spring WebFlux, reuse the `Files.createDirectories` pattern demonstrated in `GitWorkspaceService` to ensure the config directory exists, add `jackson-dataformat-yaml`/encryption helpers, and provide reload utilities so subsequent CLI commands ingest the stored runner id/name/labels/serverUrl.",
             "status": "pending",
-            "testStrategy": "Mock `WebClient`/`MockWebServer` interactions (OK, 4xx/5xx, TLS failures) to verify ping + retry logic, and use temp directories to confirm encrypted YAML persistence without touching the actual home folder."
+            "testStrategy": "Mock `WebClient`/`MockWebServer` interactions (OK, 4xx/5xx, TLS failures) to verify ping + retry logic, and use temp directories to confirm encrypted YAML persistence without touching the actual home folder.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -36,17 +38,18 @@
             "dependencies": [],
             "details": "Create `IntegrateCommandTest` under `src/test/java/io/jgitkins/runner/cli` plus service-level suites in `src/test/java/io/jgitkins/runner/application/service`, using `@TempDir` (or `TemporaryFolder`) to isolate config writes from the real `~/.jgitkins-runner`.",
             "status": "pending",
-            "testStrategy": "Combine Picocli command tests with `MockWebServer` assertions for HTTP calls and filesystem assertions checking encrypted metadata, and add mocked WebClient retries to guarantee errors bubble up with actionable remediation guidance."
+            "testStrategy": "Combine Picocli command tests with `MockWebServer` assertions for HTTP calls and filesystem assertions checking encrypted metadata, and add mocked WebClient retries to guarantee errors bubble up with actionable remediation guidance.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 2,
+        "id": "2",
         "title": "Feature Plugin Management",
         "description": "Add a first-class plugin management workflow so each runner profile can declare the Jenkins plugins required for a pipeline, persist those definitions in the CLI config, and ensure the Docker executor mounts the resolved bundle before calling the server.",
         "status": "pending",
         "dependencies": [
-          2
+          "2"
         ],
         "priority": "medium",
         "details": "- Teach the CLI config loader to read/write a `plugins` section in `~/.jgitkins-runner/config.yml`, keep named bundles per profile, and expose Picocli flags that let `run` reference a specific `plugins.yaml` manifest.\n- Introduce a parser (e.g., `PluginBundleLoader` under `src/main/java/io/jgitkins/runner/infrastructure/plugins`) that reads the YAML, downloads/cache `.jpi` files, and mirrors Jenkinsfile Runner’s expected directory layout before execution.\n- Extend `JobExecuteRequest` (`src/main/java/io/jgitkins/runner/presentation/api/dto/JobExecuteRequest.java`) and related DTO/command objects so `/pipelines/run` can accept an optional plugin bundle identifier or manifest path; default to the active profile’s bundle.\n- Update `DockerRunnerAdapter.run` (`src/main/java/io/jgitkins/runner/infrastructure/adapter/DockerRunnerAdapter.java`) so the `Bind` list includes both the workspace and the resolved plugin volume (mount to `/usr/share/jenkins/ref/plugins` or configurable `runner.plugins.mountPath`).\n- Provide CLI subcommands such as `plugins list`, `plugins sync`, and `plugins use` to inspect/update bundles, persisting changes back to the YAML config alongside existing registration data.\n- Document plugin workflow in `README.md`, including how to author `plugins.yaml`, where bundles are cached, and how to override bundles per `run` invocation.\nPseudo:\n```\nPluginBundle bundle = pluginBundleLoader.load(activeProfile);\nBind plugins = new Bind(bundle.getPath(), new Volume(config.getPluginsMountPath()));\nCreateContainerResponse container = dockerClient.createContainerCmd(image)\n    .withBinds(workspaceBind, plugins)\n    .exec();\n```\n",
@@ -59,7 +62,8 @@
             "dependencies": [],
             "details": "/Users/alzar/task/sources/jgitkins/jgitkins-runner/src/main/java/io/jgitkins/runner infrastructure config loader pending",
             "status": "pending",
-            "testStrategy": "Picocli integration test ensuring `plugins list` interacts with `@TempDir` config file."
+            "testStrategy": "Picocli integration test ensuring `plugins list` interacts with `@TempDir` config file.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -68,7 +72,8 @@
             "dependencies": [],
             "details": "Touches PluginBundleLoader (new) and /Users/alzar/task/sources/jgitkins/jgitkins-runner/src/main/java/io/jgitkins/runner/infrastructure/adapter/DockerRunnerAdapter.java.",
             "status": "pending",
-            "testStrategy": "Unit test verifying mount list includes plugin bind; bundle loader test covering YAML parsing."
+            "testStrategy": "Unit test verifying mount list includes plugin bind; bundle loader test covering YAML parsing.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -77,12 +82,13 @@
             "dependencies": [],
             "details": "/Users/alzar/task/sources/jgitkins/jgitkins-runner/src/main/java/io/jgitkins/runner/presentation/api/dto/JobExecuteRequest.java and JobExecutionService adjustments.",
             "status": "pending",
-            "testStrategy": "Controller test confirming request payload with plugin info is validated and forwarded."
+            "testStrategy": "Controller test confirming request payload with plugin info is validated and forwarded.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 3,
+        "id": "3",
         "title": "Feature Workspace Sharing between Application's instance and executed docker's workspace",
         "description": "Ensure the Jenkinsfile Runner container mounts the same host workspace prepared by `GitWorkspaceService` so the Spring Boot process and the container operate on identical files.",
         "status": "pending",
@@ -93,7 +99,7 @@
         "subtasks": []
       },
       {
-        "id": 4,
+        "id": "4",
         "title": "Feature Job Consume Event",
         "description": "Expose API to receive trigger events and kick off fetch/execute flow automatically.",
         "details": "- Create `TriggerController` (`/triggers/git`) accepting payload with repo URL, ref, task ID similar to GitLab Runner callbacks.\n- Validate signature/token header before processing.\n- Use `@Async` or message queue stub to call `GitWorkspaceService.fetchAndCheckout`, then if `autoExecute` true, reuse `JobExecuteUseCase` to start pipeline.\n- Provide CLI helper `runner listen` to poll server for triggers when webhooks unavailable.\nPseudo:\n```\n@PostMapping(\"/git\")\npublic ResponseEntity<Void> handle(@RequestBody TriggerPayload payload) {\n  workspaceService.fetchAndCheckout(...);\n  if (payload.execute()) jobExecuteUseCase.execute(cmd);\n}\n```\n- Update README for webhook configuration.",
@@ -104,7 +110,7 @@
         "subtasks": []
       },
       {
-        "id": 5,
+        "id": "5",
         "title": "Feature Concurrent Job Limitation",
         "description": "Introduce a configurable concurrency guard so the runner only executes a bounded number of jobs simultaneously, pulling defaults from `runner.concurrency` properties and optional CLI/API overrides while ensuring `JobController` and `JobExecutionService` enforce the limit before scheduling Docker workloads.",
         "status": "pending",
@@ -120,7 +126,8 @@
             "dependencies": [],
             "details": "Expose fields for `maxParallelJobs`, `queueCapacity`, and `acquireTimeoutSeconds`, and ensure CLI config persistence mirrors these values.",
             "status": "pending",
-            "testStrategy": null
+            "testStrategy": null,
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -129,7 +136,8 @@
             "dependencies": [],
             "details": "Acquire permits before workspace prep and `ContainerRunnerPort.run(...)`, release them in `finally`, and map limiter failures to a new `JobStatus` value surfaced through `JobExecuteResponse`.",
             "status": "pending",
-            "testStrategy": null
+            "testStrategy": null,
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -138,15 +146,34 @@
             "dependencies": [],
             "details": "Wire new fields through `JobController` builders and persist CLI defaults in `~/.jgitkins-runner/config.yml` for parity with REST.",
             "status": "pending",
-            "testStrategy": null
+            "testStrategy": null,
+            "parentId": "undefined"
           }
         ]
+      },
+      {
+        "id": "6",
+        "title": "Feature Integrate MQ",
+        "description": "Add a message-queue based ingestion path so runners can consume async job notifications, translate them into JobExecute commands, and execute pipelines without relying solely on HTTP polling.",
+        "details": "- Extend `build.gradle` with `org.springframework.boot:spring-boot-starter-amqp` so RabbitMQ (or compatible AMQP brokers) can be wired into the existing Spring Boot runtime used by `JobController` and `JobExecutionService`.\n- Introduce `RunnerQueueProperties` under `src/main/java/io/jgitkins/runner/infrastructure/config` binding `runner.queue` values (broker URL/credentials, queue/exchange names, prefetch, retry intervals) from `application.yml` and mirroring the same structure inside the CLI config that Task 1 is already persisting.\n- Create a DTO (e.g., `QueueJobMessage` in `src/main/java/io/jgitkins/runner/infrastructure/mq`) that reuses the fields from the trigger payload in `TriggerController` (Task 4) so the MQ path and REST webhook share the same schema.\n- Provide an `MqConfig` class defining the Spring AMQP beans (connection factory, `Queue`, optional `TopicExchange`, and dead-letter queue) while keeping everything conditional on properties to avoid affecting environments without MQ.\n- Implement `RabbitJobMessageListener` (`@RabbitListener` on the configured queue) that validates signatures/token like `TriggerController`, deserializes the payload, and invokes `JobExecuteUseCase` with a constructed `JobExecuteCommand`; include error handling that rejects/acks appropriately and publishes failures to the dead-letter queue.\n- Surface a lightweight `QueuePublisher` so the CLI helper from Task 4 (the planned `runner listen` command) can forward polling results into MQ when webhooks aren’t available, ensuring a single abstraction for enqueueing jobs.\n- Document the new properties in `README.md` and provide an example `application.yml` snippet plus instructions for enabling MQ in runner deployments.",
+        "testStrategy": "- Add a `RunnerQueuePropertiesTest` using Spring’s `ApplicationContextRunner` to ensure binding/validation of `runner.queue` defaults and overrides from `application.yml`.\n- Write `RabbitJobMessageListenerTest` leveraging `spring-rabbit-test`’s `SimpleMessageListenerContainerFactory` to deliver a serialized `QueueJobMessage` and assert the spy `JobExecuteUseCase` receives the expected `JobExecuteCommand`; include negative cases (invalid signature, malformed JSON) to verify reject/ack behavior.\n- Create an integration test (e.g., `MqExecutionFlowIT`) that spins up `TestRabbitMQ` (or Testcontainers) along with the Spring context, publishes a message, and confirms `DockerRunnerAdapter` is invoked via a mock `ContainerRunnerPort` to validate the end-to-end MQ-triggered execution path.",
+        "status": "in-progress",
+        "dependencies": [
+          "4"
+        ],
+        "priority": "medium",
+        "subtasks": [],
+        "updatedAt": "2025-11-29T00:50:13.718Z"
       }
     ],
     "metadata": {
-      "created": "2025-11-28T05:56:43.411Z",
-      "updated": "2025-11-28T05:56:43.411Z",
-      "description": "Tasks for master context"
+      "version": "1.0.0",
+      "lastModified": "2025-11-29T00:50:13.719Z",
+      "taskCount": 6,
+      "completedCount": 0,
+      "tags": [
+        "master"
+      ]
     }
   }
 }
