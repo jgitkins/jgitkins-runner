@@ -11,6 +11,13 @@ public class TaskConsumer {
     @RabbitListener(queues = "jgitkins.task.queue")
     public void receiveTask(String message) {
         log.info("Received task message: {}", message);
-        // TODO: Process the task
+        try {
+
+            log.info("waiting..");
+            Thread.sleep(5000L);
+
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
