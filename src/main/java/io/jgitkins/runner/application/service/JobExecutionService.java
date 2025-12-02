@@ -5,9 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import io.jgitkins.runner.application.port.in.JobExecuteCommand;
 import io.jgitkins.runner.application.port.in.JobExecuteUseCase;
 import io.jgitkins.runner.application.port.out.ContainerRunnerPort;
+import io.jgitkins.runner.application.port.out.WorkspacePort;
 import io.jgitkins.runner.domain.ExecutionResult;
 import io.jgitkins.runner.domain.JobStatus;
-import io.jgitkins.runner.infrastructure.git.GitWorkspaceService;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
@@ -17,18 +17,17 @@ import java.nio.file.Path;
 @RequiredArgsConstructor
 public class JobExecutionService implements JobExecuteUseCase {
 
-    private final GitWorkspaceService workspaceService;
+    private final WorkspacePort workspacePort;
     private final ContainerRunnerPort containerRunnerPort;
 
     @Override
     public ExecutionResult execute(JobExecuteCommand command) {
         try {
-            Path workspace = workspaceService.prepareWorkspace(
+            Path workspace = workspacePort.prepareWorkspace(
                     command.getRepoUrl(),
                     command.getTaskCd(),
                     command.getRepoName(),
-                    command.getRef()
-            );
+                    command.getRef());
 
             int exitCode = containerRunnerPort.run(workspace, command.getDockerImage());
             JobStatus status = exitCode == 0 ? JobStatus.SUCCESS : JobStatus.FAILURE;
