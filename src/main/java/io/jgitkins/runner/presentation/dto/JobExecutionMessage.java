@@ -1,9 +1,9 @@
-package io.jgitkins.runner.presentation.api.dto;
+package io.jgitkins.runner.presentation.dto;
 
 import lombok.Data;
 
 @Data
-public class JobExecuteRequest {
+public class JobExecutionMessage {
     private String repoUrl;
     private String taskCd;
     private String repoName;

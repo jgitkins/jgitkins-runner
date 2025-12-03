@@ -1,6 +1,6 @@
 package io.jgitkins.runner.infrastructure.config;
 
-import io.jgitkins.runner.presentation.consumer.TaskConsumer;
+import io.jgitkins.runner.presentation.consumer.JobExecutionConsumer;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.adapter.MessageListenerAdapter;
@@ -13,7 +13,8 @@ public class RabbitConsumerConfig {
 
     // 메세지 1개씩만 소비
     @Bean
-    public SimpleMessageListenerContainer simpleMessageListenerContainer(ConnectionFactory connectionFactory, MessageListenerAdapter messageListener, Jackson2JsonMessageConverter jsonMessageConverter) {
+    public SimpleMessageListenerContainer simpleMessageListenerContainer(ConnectionFactory connectionFactory,
+            MessageListenerAdapter messageListener, Jackson2JsonMessageConverter jsonMessageConverter) {
 
         messageListener.setMessageConverter(jsonMessageConverter);
 
@@ -26,14 +27,13 @@ public class RabbitConsumerConfig {
         return container;
     }
 
-
     @Bean
-    public MessageListenerAdapter listenerAdapter(TaskConsumer taskConsumer){
-        return new MessageListenerAdapter(taskConsumer, "receiveTask");
+    public MessageListenerAdapter listenerAdapter(JobExecutionConsumer jobExecutionConsumer) {
+        return new MessageListenerAdapter(jobExecutionConsumer, "receiveTask");
     }
 
     @Bean
-    public Jackson2JsonMessageConverter jsonMessageConverter(){
+    public Jackson2JsonMessageConverter jsonMessageConverter() {
         return new Jackson2JsonMessageConverter();
     }
 }
