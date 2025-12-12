@@ -60,7 +60,8 @@ JGitkins Runner does not run a Docker daemon inside itself. Instead, it utilizes
 | 3 | Feature Workspace Sharing between Application's instance and executed docker's workspace | pending | medium | 0 |
 | 4 | Feature Job Consume Event | pending | medium | 0 |
 | 5 | Feature Concurrent Job Limitation | pending | high | 3 |
-| 6 | Feature Integrate MQ | in-progress | medium | 0 |
+| 6 | Feature Integrate MQ | cancelled | medium | 0 |
+| 7 | Migrate Service Communication to gRPC for Job Triggers | pending | medium | 0 |
 
 <!-- TASKS-TABLE:END -->
 

@@ -152,16 +152,29 @@
         ]
       },
       {
-        "id": "6",
+        "id": 6,
         "title": "Feature Integrate MQ",
         "description": "Wire RabbitMQ into the current Spring Boot runner so asynchronous trigger messages flow through `RabbitConsumerConfig` and the new queue abstractions, translating payloads shared with `TriggerController` into `JobExecuteCommand` executions without relying solely on HTTP polling.",
-        "status": "in-progress",
+        "status": "cancelled",
         "dependencies": [
           "4"
         ],
         "priority": "medium",
         "details": "- `build.gradle`에 `org.springframework.boot:spring-boot-starter-amqp` 의존성을 추가하고, 기존 `RabbitConsumerConfig`가 사용하는 `ConnectionFactory`/`SimpleMessageListenerContainer` 빈 구성을 MQ 사용 여부(`runner.queue.enabled`)에 따라 조건부로 활성화한다.\n- `src/main/java/io/jgitkins/runner/infrastructure/config`에 `RunnerQueueProperties`를 추가해 `application.yml`의 `runner.queue` 섹션(브로커 URL·자격 증명, 큐/익스체인지 이름, prefetch, 재시도 대기 등)과 CLI 설정에 동일한 구조를 바인딩한다; `RunnerQueuePropertiesTest`로 기본/오버라이드 값을 검증한다.\n- `src/main/java/io/jgitkins/runner/infrastructure/mq/QueueJobMessage.java` DTO를 만들어 `TriggerController`가 소비하는 트리거 페이로드 필드를 재사용하고, `spring-rabbit` 메시지 컨버터(`Jackson2JsonMessageConverter`)와 호환되도록 직렬화 어노테이션을 맞춘다.\n- 신규 `MqConfig` 클래스에서 `Queue`, `TopicExchange`, DLQ, `RabbitTemplate` 등을 정의하고, dead-letter 라우팅 키·바인딩을 `RunnerQueueProperties` 값으로 주입해 환경마다 큐 구성을 커스터마이즈할 수 있게 한다.\n- `src/main/java/io/jgitkins/runner/presentation/consumer`의 단순 `TaskConsumer`를 대체할 `RabbitJobMessageListener`를 만들고 `@RabbitListener`로 큐를 구독하여 `TriggerController`와 동일한 서명 검증을 수행한 뒤 `JobExecuteUseCase`에 `JobExecuteCommand`를 전달하도록 한다; ack/reject 및 DLQ 게시 로직을 포함한다.\n- CLI `runner listen` 경로에서도 재사용할 `QueuePublisher` (예: `src/main/java/io/jgitkins/runner/infrastructure/mq/QueuePublisher.java`)를 제공해 REST 폴링 결과를 MQ에 위임할 수 있게 하고, MQ 미사용 시에는 no-op 구현을 주입한다.\n- `README.md`와 `src/main/resources/application.yml` 예시를 업데이트하여 `runner.queue` 속성, RabbitMQ 활성화 절차, dockerized runner 배포 시 필요한 환경 변수/권한 설정을 문서화한다.",
         "testStrategy": "- `RunnerQueuePropertiesTest` should cover binding/validation by loading `application.yml` slices via `ApplicationContextRunner` and asserting defaults/prefetch/retry overrides.\n- `RabbitJobMessageListenerTest` can use `spring-rabbit-test` to inject serialized `QueueJobMessage` payloads, verifying valid signatures call `JobExecuteUseCase`, while malformed JSON or bad signatures trigger reject/DLQ publishing.\n- `MqExecutionFlowIT` spins up Testcontainers RabbitMQ with the Spring context, publishes through `QueuePublisher`, and asserts `DockerRunnerAdapter` (mocked `ContainerRunnerPort`) runs the job end-to-end over the MQ path.",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Migrate Service Communication to gRPC for Job Triggers",
+        "description": "Replace or augment existing HTTP-based job trigger mechanisms with a gRPC service, enhancing performance and enabling more efficient inter-service communication.",
+        "details": "1. Add `grpc-netty-starter` and `protobuf-gradle-plugin` dependencies to `build.gradle` for gRPC runtime and proto file compilation.\n2. Define `.proto` schema in `src/main/proto/jgitkins/runner/trigger.proto` for messages like `JobTriggerRequest` (containing fields such as repository URL, reference, and task ID) and `JobTriggerResponse`.\n3. Configure the `protobuf-gradle-plugin` to generate Java gRPC server/client stubs during the build process.\n4. Implement a new gRPC service, `JGitKinsTriggerService` (e.g., in `src/main/java/io/jgitkins/runner/rpc/JGitKinsTriggerService.java`), which extends the generated gRPC service base class.\n5. The `triggerJob` method within `JGitKinsTriggerService` should encapsulate the job triggering logic, mirroring the current flow found in `TriggerController` (specifically, calling `GitWorkspaceService.fetchAndCheckout` and subsequently `JobExecuteUseCase`).\n6. Integrate the gRPC server into the Spring Boot application startup, ensuring it listens on a configurable port. Consider how existing security measures (if any, from `TriggerController`) might be adapted for gRPC authentication.\n7. Provide configuration properties to optionally disable the legacy `TriggerController` HTTP endpoint once the gRPC service is stable and fully operational.\n8. Ensure proper exception handling and status code mapping for gRPC calls.",
+        "testStrategy": "1. Create unit tests for `JGitKinsTriggerService` using mocking frameworks (e.g., Mockito) to verify that internal service calls to `GitWorkspaceService` and `JobExecuteUseCase` are made correctly with the expected parameters from gRPC requests.\n2. Implement integration tests leveraging `grpc-spring-boot-starter-test` or by setting up an in-memory gRPC server to simulate end-to-end communication.\n3. Write test cases that use a gRPC client to send `JobTriggerRequest` payloads and assert that the `JGitKinsTriggerService` successfully processes them, returning a `JobTriggerResponse` and initiating the job execution process (verify via logs or mocked component interactions).\n4. Test various scenarios including valid requests, malformed requests, and error conditions to ensure robust error handling and appropriate gRPC status codes.\n5. If performance metrics are a concern, conduct basic performance comparisons between the new gRPC endpoint and the existing HTTP `TriggerController` using a load testing tool, sending a high volume of trigger requests.",
+        "status": "pending",
+        "dependencies": [
+          4
+        ],
+        "priority": "medium",
         "subtasks": []
       }
     ],
@@ -174,7 +187,8 @@
         "master"
       ],
       "created": "2025-12-04T06:14:00.620Z",
-      "description": "Tasks for master context"
+      "description": "Tasks for master context",
+      "updated": "2025-12-12T10:33:16.902Z"
     }
   }
 }
