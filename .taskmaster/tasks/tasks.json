@@ -2,7 +2,7 @@
   "master": {
     "tasks": [
       {
-        "id": "1",
+        "id": 1,
         "title": "Feature Runner Integration with CLI",
         "description": "Feature integration requires wiring a Picocli-driven `integrate` command under `src/main/java/io/jgitkins/runner/cli` so `java -jar build/libs/jgitkins-runner.jar integrate --server-url … --token … --label … --name …` boots only the lightweight context from `JGitkinsRunnerApplication.java`, validates args, invokes `{serverUrl}/runners/register` before the existing `/pipelines/run` flow in `src/main/java/io/jgitkins/runner/presentation/JobController.java`, and persists encrypted runner metadata to `~/.jgitkins-runner/config.yml` for future CLI/REST parity while mapping errors to `src/main/java/io/jgitkins/runner/domain/JobStatus.java` exit codes.",
         "status": "pending",
@@ -44,7 +44,7 @@
         ]
       },
       {
-        "id": "2",
+        "id": 2,
         "title": "Feature Plugin Management",
         "description": "Add a first-class plugin management workflow so each runner profile can declare the Jenkins plugins required for a pipeline, persist those definitions in the CLI config, and ensure the Docker executor mounts the resolved bundle before calling the server.",
         "status": "pending",
@@ -88,7 +88,7 @@
         ]
       },
       {
-        "id": "3",
+        "id": 3,
         "title": "Feature Workspace Sharing between Application's instance and executed docker's workspace",
         "description": "Ensure the Jenkinsfile Runner container mounts the same host workspace prepared by `GitWorkspaceService` so the Spring Boot process and the container operate on identical files.",
         "status": "pending",
@@ -99,7 +99,7 @@
         "subtasks": []
       },
       {
-        "id": "4",
+        "id": 4,
         "title": "Feature Job Consume Event",
         "description": "Expose API to receive trigger events and kick off fetch/execute flow automatically.",
         "details": "- Create `TriggerController` (`/triggers/git`) accepting payload with repo URL, ref, task ID similar to GitLab Runner callbacks.\n- Validate signature/token header before processing.\n- Use `@Async` or message queue stub to call `GitWorkspaceService.fetchAndCheckout`, then if `autoExecute` true, reuse `JobExecuteUseCase` to start pipeline.\n- Provide CLI helper `runner listen` to poll server for triggers when webhooks unavailable.\nPseudo:\n```\n@PostMapping(\"/git\")\npublic ResponseEntity<Void> handle(@RequestBody TriggerPayload payload) {\n  workspaceService.fetchAndCheckout(...);\n  if (payload.execute()) jobExecuteUseCase.execute(cmd);\n}\n```\n- Update README for webhook configuration.",
@@ -110,7 +110,7 @@
         "subtasks": []
       },
       {
-        "id": "5",
+        "id": 5,
         "title": "Feature Concurrent Job Limitation",
         "description": "Introduce a configurable concurrency guard so the runner only executes a bounded number of jobs simultaneously, pulling defaults from `runner.concurrency` properties and optional CLI/API overrides while ensuring `JobController` and `JobExecutionService` enforce the limit before scheduling Docker workloads.",
         "status": "pending",
@@ -154,16 +154,15 @@
       {
         "id": "6",
         "title": "Feature Integrate MQ",
-        "description": "Add a message-queue based ingestion path so runners can consume async job notifications, translate them into JobExecute commands, and execute pipelines without relying solely on HTTP polling.",
-        "details": "- Extend `build.gradle` with `org.springframework.boot:spring-boot-starter-amqp` so RabbitMQ (or compatible AMQP brokers) can be wired into the existing Spring Boot runtime used by `JobController` and `JobExecutionService`.\n- Introduce `RunnerQueueProperties` under `src/main/java/io/jgitkins/runner/infrastructure/config` binding `runner.queue` values (broker URL/credentials, queue/exchange names, prefetch, retry intervals) from `application.yml` and mirroring the same structure inside the CLI config that Task 1 is already persisting.\n- Create a DTO (e.g., `QueueJobMessage` in `src/main/java/io/jgitkins/runner/infrastructure/mq`) that reuses the fields from the trigger payload in `TriggerController` (Task 4) so the MQ path and REST webhook share the same schema.\n- Provide an `MqConfig` class defining the Spring AMQP beans (connection factory, `Queue`, optional `TopicExchange`, and dead-letter queue) while keeping everything conditional on properties to avoid affecting environments without MQ.\n- Implement `RabbitJobMessageListener` (`@RabbitListener` on the configured queue) that validates signatures/token like `TriggerController`, deserializes the payload, and invokes `JobExecuteUseCase` with a constructed `JobExecuteCommand`; include error handling that rejects/acks appropriately and publishes failures to the dead-letter queue.\n- Surface a lightweight `QueuePublisher` so the CLI helper from Task 4 (the planned `runner listen` command) can forward polling results into MQ when webhooks aren’t available, ensuring a single abstraction for enqueueing jobs.\n- Document the new properties in `README.md` and provide an example `application.yml` snippet plus instructions for enabling MQ in runner deployments.",
-        "testStrategy": "- Add a `RunnerQueuePropertiesTest` using Spring’s `ApplicationContextRunner` to ensure binding/validation of `runner.queue` defaults and overrides from `application.yml`.\n- Write `RabbitJobMessageListenerTest` leveraging `spring-rabbit-test`’s `SimpleMessageListenerContainerFactory` to deliver a serialized `QueueJobMessage` and assert the spy `JobExecuteUseCase` receives the expected `JobExecuteCommand`; include negative cases (invalid signature, malformed JSON) to verify reject/ack behavior.\n- Create an integration test (e.g., `MqExecutionFlowIT`) that spins up `TestRabbitMQ` (or Testcontainers) along with the Spring context, publishes a message, and confirms `DockerRunnerAdapter` is invoked via a mock `ContainerRunnerPort` to validate the end-to-end MQ-triggered execution path.",
+        "description": "Wire RabbitMQ into the current Spring Boot runner so asynchronous trigger messages flow through `RabbitConsumerConfig` and the new queue abstractions, translating payloads shared with `TriggerController` into `JobExecuteCommand` executions without relying solely on HTTP polling.",
         "status": "in-progress",
         "dependencies": [
           "4"
         ],
         "priority": "medium",
-        "subtasks": [],
-        "updatedAt": "2025-11-29T00:50:13.718Z"
+        "details": "- `build.gradle`에 `org.springframework.boot:spring-boot-starter-amqp` 의존성을 추가하고, 기존 `RabbitConsumerConfig`가 사용하는 `ConnectionFactory`/`SimpleMessageListenerContainer` 빈 구성을 MQ 사용 여부(`runner.queue.enabled`)에 따라 조건부로 활성화한다.\n- `src/main/java/io/jgitkins/runner/infrastructure/config`에 `RunnerQueueProperties`를 추가해 `application.yml`의 `runner.queue` 섹션(브로커 URL·자격 증명, 큐/익스체인지 이름, prefetch, 재시도 대기 등)과 CLI 설정에 동일한 구조를 바인딩한다; `RunnerQueuePropertiesTest`로 기본/오버라이드 값을 검증한다.\n- `src/main/java/io/jgitkins/runner/infrastructure/mq/QueueJobMessage.java` DTO를 만들어 `TriggerController`가 소비하는 트리거 페이로드 필드를 재사용하고, `spring-rabbit` 메시지 컨버터(`Jackson2JsonMessageConverter`)와 호환되도록 직렬화 어노테이션을 맞춘다.\n- 신규 `MqConfig` 클래스에서 `Queue`, `TopicExchange`, DLQ, `RabbitTemplate` 등을 정의하고, dead-letter 라우팅 키·바인딩을 `RunnerQueueProperties` 값으로 주입해 환경마다 큐 구성을 커스터마이즈할 수 있게 한다.\n- `src/main/java/io/jgitkins/runner/presentation/consumer`의 단순 `TaskConsumer`를 대체할 `RabbitJobMessageListener`를 만들고 `@RabbitListener`로 큐를 구독하여 `TriggerController`와 동일한 서명 검증을 수행한 뒤 `JobExecuteUseCase`에 `JobExecuteCommand`를 전달하도록 한다; ack/reject 및 DLQ 게시 로직을 포함한다.\n- CLI `runner listen` 경로에서도 재사용할 `QueuePublisher` (예: `src/main/java/io/jgitkins/runner/infrastructure/mq/QueuePublisher.java`)를 제공해 REST 폴링 결과를 MQ에 위임할 수 있게 하고, MQ 미사용 시에는 no-op 구현을 주입한다.\n- `README.md`와 `src/main/resources/application.yml` 예시를 업데이트하여 `runner.queue` 속성, RabbitMQ 활성화 절차, dockerized runner 배포 시 필요한 환경 변수/권한 설정을 문서화한다.",
+        "testStrategy": "- `RunnerQueuePropertiesTest` should cover binding/validation by loading `application.yml` slices via `ApplicationContextRunner` and asserting defaults/prefetch/retry overrides.\n- `RabbitJobMessageListenerTest` can use `spring-rabbit-test` to inject serialized `QueueJobMessage` payloads, verifying valid signatures call `JobExecuteUseCase`, while malformed JSON or bad signatures trigger reject/DLQ publishing.\n- `MqExecutionFlowIT` spins up Testcontainers RabbitMQ with the Spring context, publishes through `QueuePublisher`, and asserts `DockerRunnerAdapter` (mocked `ContainerRunnerPort`) runs the job end-to-end over the MQ path.",
+        "subtasks": []
       }
     ],
     "metadata": {
@@ -173,7 +172,9 @@
       "completedCount": 0,
       "tags": [
         "master"
-      ]
+      ],
+      "created": "2025-12-04T06:14:00.620Z",
+      "description": "Tasks for master context"
     }
   }
 }
