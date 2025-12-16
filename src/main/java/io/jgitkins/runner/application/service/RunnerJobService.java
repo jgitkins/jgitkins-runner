@@ -1,21 +1,22 @@
 package io.jgitkins.runner.application.service;
 
 import io.jgitkins.runner.application.port.in.RunnerJobUseCase;
+import io.jgitkins.runner.application.port.out.ContainerRunnerPort;
 import io.jgitkins.runner.application.port.out.JobFetchPort;
 import io.jgitkins.runner.application.port.out.JobResultPort;
-import io.jgitkins.runner.application.port.out.ContainerRunnerPort;
 import io.jgitkins.runner.application.port.out.RepositorySyncPort;
 import io.jgitkins.runner.domain.ExecutionResult;
 import io.jgitkins.runner.domain.JobStatus;
 import io.jgitkins.runner.domain.RunnerConfiguration;
 import io.jgitkins.server.grpc.JobPayload;
 import io.jgitkins.server.grpc.JobResultStatus;
-import java.nio.file.Path;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
@@ -57,7 +58,10 @@ public class RunnerJobService implements RunnerJobUseCase {
                                                                Long.toString(payload.getRepositoryId()),
                                                                payload.getBranchName());
 
-            int exitCode = containerRunnerPort.run(workspace, configuration.getDefaultDockerImage());
+            // TODO:
+            int exitCode = containerRunnerPort.run(workspace.toAbsolutePath().toString(),
+                                                   configuration.getDefaultDockerImage(),
+                                                   "TODO: ");
             JobStatus jobStatus = exitCode == 0 ? JobStatus.SUCCESS : JobStatus.FAILURE;
 
             log.info("jobStatus: [{}]", jobStatus);

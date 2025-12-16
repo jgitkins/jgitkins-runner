@@ -28,6 +28,7 @@ public class RunnerConfigurationPersistenceAdapter implements RunnerConfiguratio
     private static final String KEY_BUSY_INTERVAL = "busyWaitIntervalMillis";
     private static final String KEY_DOCKER_IMAGE = "defaultDockerImage";
     private static final String KEY_JENKINSFILE_PATH = "defaultJenkinsfilePath";
+    private static final String KEY_JENKINS_PLUGIN_PATH= "pluginPath";
 
     private final RunnerEntityMbgMapper runnerMapper;
     private final RunnerConfigEntityMbgMapper configMapper;
@@ -105,6 +106,7 @@ public class RunnerConfigurationPersistenceAdapter implements RunnerConfiguratio
                                   .busyWaitInterval(parseDuration(configMap.get(KEY_BUSY_INTERVAL)))
                                   .defaultDockerImage(configMap.get(KEY_DOCKER_IMAGE))
                                   .defaultJenkinsfilePath(configMap.get(KEY_JENKINSFILE_PATH))
+                                  .pluginPath(configMap.get(KEY_JENKINS_PLUGIN_PATH))
                                   .build();
     }
 

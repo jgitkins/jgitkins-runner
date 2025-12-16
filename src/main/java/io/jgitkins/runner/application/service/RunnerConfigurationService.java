@@ -29,8 +29,8 @@ public class RunnerConfigurationService {
     @PostConstruct
     public void initialize() {
         RunnerConfiguration configuration = configurationPort.loadConfiguration()
-                                                                   .map(this::mergeWithDefaults)
-                                                                   .orElseGet(() -> mergeWithDefaults(RunnerConfiguration.fromProperties(runnerProperties)));
+                                                             .map(this::mergeWithDefaults)
+                                                             .orElseGet(() -> mergeWithDefaults(RunnerConfiguration.fromProperties(runnerProperties)));
         currentConfiguration.set(configuration);
         logConfigurationStatus(configuration);
     }

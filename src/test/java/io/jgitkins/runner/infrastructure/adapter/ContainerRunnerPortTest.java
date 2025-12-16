@@ -38,14 +38,15 @@ public class ContainerRunnerPortTest {
     void test_run_successful() {
 
         String image = "jenkins/jenkinsfile-runner";
+        String pluginConfigPath = "/Users/hwiryungkim/TMP/runner/plugins.txt";
         Path workspace = null;
         try {
             String cloneUrl = "http://localhost:8084/git/demo-org/ccc.git";
             String taskCd = "demo-org";
             String repoName = "ccc";
-            String ref = "main";
+            String ref = "378e2aff9a5bddf5f2db16d1e9182cfdf230ac29";
             workspace = repositorySyncPort.syncRepository(cloneUrl, taskCd, repoName, ref);
-            containerRunnerPort.run(workspace, image);
+            containerRunnerPort.run(workspace.toAbsolutePath().toString(), image, pluginConfigPath);
         } catch (Exception e) {
 //            System.out.println("error : , e.getMessage(), e)k;
 
@@ -67,4 +68,3 @@ public class ContainerRunnerPortTest {
 //        this.exitCode.set(exitCode);
 //    }
 }
-

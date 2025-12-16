@@ -17,6 +17,7 @@ public class RunnerConfiguration {
     Duration busyWaitInterval;
     String defaultDockerImage;
     String defaultJenkinsfilePath;
+    String pluginPath;
 
     public boolean isLinked() {
         return runnerToken != null && !runnerToken.isBlank();
