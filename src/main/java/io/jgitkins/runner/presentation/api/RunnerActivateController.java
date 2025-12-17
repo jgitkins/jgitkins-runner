@@ -1,9 +1,9 @@
 package io.jgitkins.runner.presentation.api;
 
-import io.jgitkins.runner.application.service.RunnerConfigurationService;
-import io.jgitkins.runner.domain.RunnerConfiguration;
+import io.jgitkins.runner.application.dto.RunnerActivateResult;
+import io.jgitkins.runner.application.port.in.RunnerActivationUseCase;
+import io.jgitkins.runner.presentation.common.ApiResponse;
 import io.jgitkins.runner.presentation.dto.RunnerActivateRequest;
-import io.jgitkins.runner.presentation.dto.RunnerLinkResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,18 +17,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class RunnerActivateController {
 
-    private final RunnerConfigurationService configurationService;
+    private final RunnerActivationUseCase activationUseCase;
 
     @PostMapping("/activate")
-    public ResponseEntity<RunnerLinkResponse> activateRunner(@Valid @RequestBody RunnerActivateRequest request) {
-        RunnerConfiguration configuration = configurationService.registerWithToken(request.getRunnerToken(), request.getActivationEndpoint());
-        RunnerLinkResponse response = RunnerLinkResponse.builder()
-                                                        .message("Runner가 서버와 연동되었습니다.")
-                                                        .serverHost(configuration.getServerHost())
-                                                        .serverPort(configuration.getServerPort())
-                                                        .defaultDockerImage(configuration.getDefaultDockerImage())
-                                                        .defaultJenkinsfilePath(configuration.getDefaultJenkinsfilePath())
-                                                        .build();
-        return ResponseEntity.ok(response);
+    public ResponseEntity<ApiResponse<RunnerActivateResult>> activateRunner(@Valid @RequestBody RunnerActivateRequest request) {
+
+        RunnerActivateResult result = activationUseCase.activate(request.getToken(), request.getBaseUrl());
+        return ResponseEntity.ok(ApiResponse.success(result));
+
     }
 }

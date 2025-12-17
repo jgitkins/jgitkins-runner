@@ -35,6 +35,7 @@ public class JobDispatchGrpcClient implements JobFetchPort, JobResultPort {
 //        }
 
         ensureChannel(configuration);
+        log.info("ensuring channel ... ");
         if (blockingStub == null) {
             return Optional.empty();
         }
@@ -79,19 +80,24 @@ public class JobDispatchGrpcClient implements JobFetchPort, JobResultPort {
     }
 
     private synchronized void ensureChannel(RunnerConfiguration configuration) {
-        if (configuration == null || configuration.getServerHost() == null || configuration.getServerHost().isBlank()) {
+        if (configuration == null || configuration.grpcHost() == null || configuration.grpcHost().isBlank()) {
             return;
         }
-        if (channel != null && configuration.getServerHost().equals(configuredHost) && configuration.getServerPort() == configuredPort) {
+        Integer port = configuration.grpcPort();
+        if (port == null || port <= 0) {
             return;
         }
+        if (channel != null && configuration.grpcHost().equals(configuredHost) && port == configuredPort) {
+            return;
+        }
+
         shutdownChannel();
-        channel = ManagedChannelBuilder.forAddress(configuration.getServerHost(), configuration.getServerPort())
+        channel = ManagedChannelBuilder.forAddress(configuration.grpcHost(), port)
                                        .usePlaintext()
                                        .build();
         blockingStub = JobDispatchServiceGrpc.newBlockingStub(channel);
-        configuredHost = configuration.getServerHost();
-        configuredPort = configuration.getServerPort();
+        configuredHost = configuration.grpcHost();
+        configuredPort = port;
     }
 
     private void shutdownChannel() {

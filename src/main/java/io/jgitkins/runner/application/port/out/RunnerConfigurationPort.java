@@ -7,5 +7,5 @@ public interface RunnerConfigurationPort {
 
     Optional<RunnerConfiguration> loadConfiguration();
 
-    void saveConfiguration(RunnerConfiguration configuration);
+    void save(RunnerConfiguration configuration);
 }

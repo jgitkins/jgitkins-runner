@@ -1,0 +1,17 @@
+### Variable 
+@url = localhost:8080
+
+
+
+#######################################################
+### Organize ##########################################
+#######################################################
+
+### Runner 활성화
+POST {{url}}/api/runner/activate
+Content-Type: application/json
+
+{
+  "token": "RNR-85B46DCBB9BF4A4F896B3E3E",
+  "baseUrl": "http://localhost:8084"
+}

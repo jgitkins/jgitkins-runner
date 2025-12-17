@@ -74,7 +74,12 @@
         <table tableName="RUNNER" domainObjectName="RunnerEntity">
             <generatedKey column="id" sqlStatement="JDBC" identity="true"/>
         </table>
+
         <table tableName="RUNNER_CONFIG" domainObjectName="RunnerConfigEntity">
+            <generatedKey column="id" sqlStatement="JDBC" identity="true"/>
+        </table>
+
+        <table tableName="RUNNER_CONFIG_FILE" domainObjectName="RunnerConfigFileEntity">
             <generatedKey column="id" sqlStatement="JDBC" identity="true"/>
         </table>
 

@@ -2,15 +2,17 @@ package io.jgitkins.runner.infrastructure.adapter;
 
 import io.jgitkins.runner.application.port.out.RunnerConfigurationPort;
 import io.jgitkins.runner.domain.RunnerConfiguration;
+import io.jgitkins.runner.infrastructure.mapper.RunnerDomainMapper;
 import io.jgitkins.runner.infrastructure.persistence.mapper.RunnerConfigEntityMbgMapper;
+import io.jgitkins.runner.infrastructure.persistence.mapper.RunnerConfigFileEntityMbgMapper;
 import io.jgitkins.runner.infrastructure.persistence.mapper.RunnerEntityMbgMapper;
 import io.jgitkins.runner.infrastructure.persistence.model.RunnerConfigEntity;
 import io.jgitkins.runner.infrastructure.persistence.model.RunnerConfigEntityCondition;
+import io.jgitkins.runner.infrastructure.persistence.model.RunnerConfigFileEntity;
+import io.jgitkins.runner.infrastructure.persistence.model.RunnerConfigFileEntityCondition;
 import io.jgitkins.runner.infrastructure.persistence.model.RunnerEntity;
 import io.jgitkins.runner.infrastructure.persistence.model.RunnerEntityCondition;
-import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -22,16 +24,10 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class RunnerConfigurationPersistenceAdapter implements RunnerConfigurationPort {
 
-    private static final String KEY_SERVER_HOST = "serverHost";
-    private static final String KEY_SERVER_PORT = "serverPort";
-    private static final String KEY_POLL_INTERVAL = "pollIntervalMillis";
-    private static final String KEY_BUSY_INTERVAL = "busyWaitIntervalMillis";
-    private static final String KEY_DOCKER_IMAGE = "defaultDockerImage";
-    private static final String KEY_JENKINSFILE_PATH = "defaultJenkinsfilePath";
-    private static final String KEY_JENKINS_PLUGIN_PATH= "pluginPath";
-
     private final RunnerEntityMbgMapper runnerMapper;
     private final RunnerConfigEntityMbgMapper configMapper;
+    private final RunnerConfigFileEntityMbgMapper configFileMapper;
+    private final RunnerDomainMapper domainEntityMapper;
 
     @Override
     public Optional<RunnerConfiguration> loadConfiguration() {
@@ -45,35 +41,27 @@ public class RunnerConfigurationPersistenceAdapter implements RunnerConfiguratio
     }
 
     @Override
-    public void saveConfiguration(RunnerConfiguration configuration) {
-        RunnerEntity runner = findRunner().orElseGet(RunnerEntity::new);
-        runner.setToken(configuration.getRunnerToken());
-        runner.setName(configuration.getRunnerName());
+    public void save(RunnerConfiguration configuration) {
+        RunnerEntity runner = domainEntityMapper.toEntity(configuration);
+        Optional<RunnerEntity> existingRunner = findRunner();
         runner.setStatus("ACTIVE");
         runner.setUpdatedAt(LocalDateTime.now());
-        if (runner.getId() == null) {
+        if (existingRunner.isPresent()) {
+            RunnerEntity current = existingRunner.get();
+            runner.setId(current.getId());
+            runner.setCreatedAt(current.getCreatedAt());
+            runnerMapper.updateByPrimaryKeySelective(runner);
+        } else {
             runner.setCreatedAt(LocalDateTime.now());
             runnerMapper.insertSelective(runner);
-        } else {
-            runnerMapper.updateByPrimaryKeySelective(runner);
         }
 
         Long runnerId = runner.getId();
-        Map<String, String> configMap = new HashMap<>();
-        putIfNotNull(configMap, KEY_SERVER_HOST, configuration.getServerHost());
-        if (configuration.getServerPort() > 0) {
-            configMap.put(KEY_SERVER_PORT, Integer.toString(configuration.getServerPort()));
-        }
-        if (configuration.getPollInterval() != null) {
-            configMap.put(KEY_POLL_INTERVAL, Long.toString(configuration.getPollInterval().toMillis()));
-        }
-        if (configuration.getBusyWaitInterval() != null) {
-            configMap.put(KEY_BUSY_INTERVAL, Long.toString(configuration.getBusyWaitInterval().toMillis()));
-        }
-        putIfNotNull(configMap, KEY_DOCKER_IMAGE, configuration.getDefaultDockerImage());
-        putIfNotNull(configMap, KEY_JENKINSFILE_PATH, configuration.getDefaultJenkinsfilePath());
+        Map<String, String> runtimeConfigMap = domainEntityMapper.toRuntimeConfigMap(configuration);
+        Map<String, String> executionConfigMap = domainEntityMapper.toExecutionConfigFileMap(configuration);
+        runtimeConfigMap.forEach((key, value) -> upsertRuntimeConfig(runnerId, key, value));
+        executionConfigMap.forEach((filename, content) -> upsertExecutionConfig(runnerId, filename, content));
 
-        configMap.forEach((key, value) -> upsertConfig(runnerId, key, value));
     }
 
     private Optional<RunnerEntity> findRunner() {
@@ -97,36 +85,10 @@ public class RunnerConfigurationPersistenceAdapter implements RunnerConfiguratio
     }
 
     private RunnerConfiguration mapToDomain(RunnerEntity runner, Map<String, String> configMap) {
-        return RunnerConfiguration.builder()
-                                  .runnerName(runner.getName())
-                                  .runnerToken(runner.getToken())
-                                  .serverHost(configMap.get(KEY_SERVER_HOST))
-                                  .serverPort(parseInt(configMap.get(KEY_SERVER_PORT)))
-                                  .pollInterval(parseDuration(configMap.get(KEY_POLL_INTERVAL)))
-                                  .busyWaitInterval(parseDuration(configMap.get(KEY_BUSY_INTERVAL)))
-                                  .defaultDockerImage(configMap.get(KEY_DOCKER_IMAGE))
-                                  .defaultJenkinsfilePath(configMap.get(KEY_JENKINSFILE_PATH))
-                                  .pluginPath(configMap.get(KEY_JENKINS_PLUGIN_PATH))
-                                  .build();
+        return domainEntityMapper.toDomain(runner, configMap);
     }
 
-    private int parseInt(String value) {
-        try {
-            return value == null ? 0 : Integer.parseInt(value);
-        } catch (NumberFormatException ex) {
-            return 0;
-        }
-    }
-
-    private Duration parseDuration(String millis) {
-        try {
-            return millis == null ? Duration.ZERO : Duration.ofMillis(Long.parseLong(millis));
-        } catch (NumberFormatException ex) {
-            return Duration.ZERO;
-        }
-    }
-
-    private void upsertConfig(Long runnerId, String key, String value) {
+    private void upsertRuntimeConfig(Long runnerId, String key, String value) {
         RunnerConfigEntityCondition condition = new RunnerConfigEntityCondition();
         condition.createCriteria()
                  .andRunnerIdEqualTo(runnerId)
@@ -147,9 +109,24 @@ public class RunnerConfigurationPersistenceAdapter implements RunnerConfiguratio
         }
     }
 
-    private void putIfNotNull(Map<String, String> map, String key, String value) {
-        if (value != null) {
-            map.put(key, value);
+    private void upsertExecutionConfig(Long runnerId, String filename, String contents) {
+        RunnerConfigFileEntityCondition condition = new RunnerConfigFileEntityCondition();
+        condition.createCriteria()
+                 .andRunnerIdEqualTo(runnerId)
+                 .andFilenameEqualTo(filename);
+        List<RunnerConfigFileEntity> current = configFileMapper.selectByCondition(condition);
+
+        RunnerConfigFileEntity entity = new RunnerConfigFileEntity();
+        entity.setRunnerId(runnerId);
+        entity.setFilename(filename);
+        entity.setContents(contents);
+        entity.setUpdatedAt(LocalDateTime.now());
+
+        if (current.isEmpty()) {
+            configFileMapper.insertSelective(entity);
+        } else {
+            entity.setId(current.get(0).getId());
+            configFileMapper.updateByPrimaryKeySelective(entity);
         }
     }
 }

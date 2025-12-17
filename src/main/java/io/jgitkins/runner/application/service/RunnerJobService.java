@@ -27,13 +27,13 @@ public class RunnerJobService implements RunnerJobUseCase {
     private final JobResultPort jobResultPort;
     private final RepositorySyncPort repositorySyncPort;
     private final ContainerRunnerPort containerRunnerPort;
-    private final RunnerConfigurationService configurationService;
+    private final RunnerInitService initService;
     private final AtomicBoolean jobInProgress = new AtomicBoolean(false);
 
     @Override
     public void execute() {
-        RunnerConfiguration configuration = configurationService.getCurrentConfiguration();
-        if (configuration == null || !configurationService.isReadyForScheduling()) {
+        RunnerConfiguration configuration = initService.getCurrentConfiguration();
+        if (configuration == null || !initService.isReadyForScheduling()) {
             return;
         }
 
@@ -60,7 +60,7 @@ public class RunnerJobService implements RunnerJobUseCase {
 
             // TODO:
             int exitCode = containerRunnerPort.run(workspace.toAbsolutePath().toString(),
-                                                   configuration.getDefaultDockerImage(),
+                                                   configuration.getRunnerImageName(),
                                                    "TODO: ");
             JobStatus jobStatus = exitCode == 0 ? JobStatus.SUCCESS : JobStatus.FAILURE;
 

@@ -13,7 +13,7 @@ public class RunnerPollingScheduler {
 
     private final RunnerJobUseCase runnerJobUseCase;
 
-    @Scheduled(fixedDelayString = "#{@runnerConfigurationService.pollIntervalMillis()}")
+    @Scheduled(fixedDelayString = "#{@runnerInitService.pollIntervalMillis()}")
     public void pollServer() {
         runnerJobUseCase.execute();
     }

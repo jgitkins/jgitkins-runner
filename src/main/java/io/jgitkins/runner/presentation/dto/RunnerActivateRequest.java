@@ -7,7 +7,9 @@ import lombok.Data;
 public class RunnerActivateRequest {
 
     @NotBlank
-    private String runnerToken;
+    private String token;
+
     @NotBlank
-    private String activationEndpoint;
+    private String baseUrl; // baseUrl - scheme
+
 }

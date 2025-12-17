@@ -24,13 +24,32 @@ public class DockerRunnerAdapter implements ContainerRunnerPort {
 
     @Override
     public int run(String repositoryPath, String image, String pluginPath) {
+        logContainerInfo(image, repositoryPath);
+        List<Bind> binds = buildBinds(repositoryPath, pluginPath);
+        String containerId = createContainer(image, binds).getId();
+
+        dockerClient.startContainerCmd(containerId).exec();
+        streamContainerLogs(containerId);
+
+        Integer exitCode = dockerClient.waitContainerCmd(containerId)
+                .exec(new WaitContainerResultCallback())
+                .awaitStatusCode();
+        log.info("Jenkinsfile Runner exit code: {}", exitCode);
+
+        removeContainer(containerId);
+        return exitCode;
+    }
+
+    private void logContainerInfo(String image, String repositoryPath) {
         log.info("Running Jenkinsfile Runner container: {}", image);
         if (StringUtils.hasText(repositoryPath)) {
             log.info("Running WorkSpace : {}", repositoryPath);
-        } else {
-            log.warn("Workspace path is not provided. Container will be started without workspace bind.");
+            return;
         }
+        log.warn("Workspace path is not provided. Container will be started without workspace bind.");
+    }
 
+    private List<Bind> buildBinds(String repositoryPath, String pluginPath) {
         List<Bind> binds = new ArrayList<>();
         if (StringUtils.hasText(repositoryPath)) {
             binds.add(new Bind(repositoryPath, new Volume("/workspace")));
@@ -38,17 +57,19 @@ public class DockerRunnerAdapter implements ContainerRunnerPort {
         if (StringUtils.hasText(pluginPath)) {
             binds.add(new Bind(pluginPath, new Volume("/workspace/plugins.txt")));
         }
+        return binds;
+    }
 
-        // 자동으로 workspace 내부에서 `Jenkinsfile` 을 찾는다.
-        CreateContainerCmd containerCmd = dockerClient.createContainerCmd(image);
+    private CreateContainerResponse createContainer(String image, List<Bind> binds) {
+        // 자동으로 workspace 내부에서 `Jenkinsfile` 을 찾는다. ★ CMD는 건드리지 않는다
+        CreateContainerCmd cmd = dockerClient.createContainerCmd(image);
         if (!binds.isEmpty()) {
-            containerCmd.withBinds(binds.toArray(new Bind[0]));    // ★ CMD는 건드리지 않는다
+            cmd.withBinds(binds.toArray(new Bind[0]));
         }
-        CreateContainerResponse container = containerCmd.exec();
+        return cmd.exec();
+    }
 
-        String containerId = container.getId();
-        dockerClient.startContainerCmd(containerId).exec();
-
+    private void streamContainerLogs(String containerId) {
         dockerClient.logContainerCmd(containerId)
                 .withStdOut(true)
                 .withStdErr(true)
@@ -59,17 +80,11 @@ public class DockerRunnerAdapter implements ContainerRunnerPort {
                         log.info("[RUNNER LOG] {}", new String(frame.getPayload()));
                     }
                 });
+    }
 
-        Integer exit = dockerClient.waitContainerCmd(containerId)
-                .exec(new WaitContainerResultCallback())
-                .awaitStatusCode();
-
-        log.info("Jenkinsfile Runner exit code: {}", exit);
-
+    private void removeContainer(String containerId) {
         dockerClient.removeContainerCmd(containerId)
                 .withForce(true)
                 .exec();
-
-        return exit;
     }
 }
