@@ -4,5 +4,5 @@ import java.nio.file.Path;
 
 public interface RepositorySyncPort {
 
-    Path syncRepository(String repoUrl, String taskCd, String repoName, String ref) throws Exception;
+    Path fetchRepository(String repoUrl, String taskCd, String repoName, String ref) throws Exception;
 }

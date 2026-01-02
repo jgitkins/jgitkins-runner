@@ -1,90 +1,66 @@
 package io.jgitkins.runner.infrastructure.adapter;
 
-import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.command.CreateContainerCmd;
-import com.github.dockerjava.api.command.CreateContainerResponse;
+import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.Frame;
-import com.github.dockerjava.api.model.Volume;
-import com.github.dockerjava.core.command.WaitContainerResultCallback;
-import java.util.ArrayList;
+import io.jgitkins.runner.application.dto.JobRunContext;
+import io.jgitkins.runner.application.port.out.JobRunnerPort;
+import io.jgitkins.runner.infrastructure.docker.DockerBindBuilder;
+import io.jgitkins.runner.infrastructure.docker.DockerContainerLifecycle;
+import io.jgitkins.runner.infrastructure.docker.DockerInputValidator;
+import io.jgitkins.runner.infrastructure.docker.DockerLogStreamer;
+import java.io.IOException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import io.jgitkins.runner.application.port.out.ContainerRunnerPort;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class DockerRunnerAdapter implements ContainerRunnerPort {
+public class DockerRunnerAdapter implements JobRunnerPort {
 
-    private final DockerClient dockerClient;
+    private final DockerInputValidator inputValidator;
+    private final DockerBindBuilder bindBuilder;
+    private final DockerLogStreamer logStreamer;
+    private final DockerContainerLifecycle lifecycle;
 
     @Override
-    public int run(String repositoryPath, String image, String pluginPath) {
-        logContainerInfo(image, repositoryPath);
-        List<Bind> binds = buildBinds(repositoryPath, pluginPath);
-        String containerId = createContainer(image, binds).getId();
+    public int run(JobRunContext context) {
+        inputValidator.validate(context);
+        String workspacePath = context.getWorkspacePath();
+        String imageName = context.getRunnerImageName();
+        String pluginPath = context.getPluginPath();
 
-        dockerClient.startContainerCmd(containerId).exec();
-        streamContainerLogs(containerId);
+        logContainerInfo(imageName, workspacePath, pluginPath);
 
-        Integer exitCode = dockerClient.waitContainerCmd(containerId)
-                .exec(new WaitContainerResultCallback())
-                .awaitStatusCode();
-        log.info("Jenkinsfile Runner exit code: {}", exitCode);
+        List<Bind> binds = bindBuilder.build(workspacePath, pluginPath);
+        String containerId = lifecycle.create(imageName, binds);
 
-        removeContainer(containerId);
-        return exitCode;
+        try {
+            lifecycle.start(containerId);
+            try (ResultCallback<Frame> logs = logStreamer.stream(containerId)) {
+                int exitCode = lifecycle.waitForExit(containerId);
+                log.info("Jenkinsfile Runner exit code: {}", exitCode);
+                return exitCode;
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        } finally {
+            lifecycle.remove(containerId);
+        }
     }
 
-    private void logContainerInfo(String image, String repositoryPath) {
+    private void logContainerInfo(String image, String repositoryPath, String pluginPath) {
         log.info("Running Jenkinsfile Runner container: {}", image);
         if (StringUtils.hasText(repositoryPath)) {
-            log.info("Running WorkSpace : {}", repositoryPath);
-            return;
-        }
-        log.warn("Workspace path is not provided. Container will be started without workspace bind.");
-    }
-
-    private List<Bind> buildBinds(String repositoryPath, String pluginPath) {
-        List<Bind> binds = new ArrayList<>();
-        if (StringUtils.hasText(repositoryPath)) {
-            binds.add(new Bind(repositoryPath, new Volume("/workspace")));
+            log.info("Workspace: {}", repositoryPath);
+        } else {
+            log.warn("Workspace path is not provided. Container will be started without workspace bind.");
         }
         if (StringUtils.hasText(pluginPath)) {
-            binds.add(new Bind(pluginPath, new Volume("/workspace/plugins.txt")));
+            log.info("Plugin config: {}", pluginPath);
         }
-        return binds;
-    }
-
-    private CreateContainerResponse createContainer(String image, List<Bind> binds) {
-        // 자동으로 workspace 내부에서 `Jenkinsfile` 을 찾는다. ★ CMD는 건드리지 않는다
-        CreateContainerCmd cmd = dockerClient.createContainerCmd(image);
-        if (!binds.isEmpty()) {
-            cmd.withBinds(binds.toArray(new Bind[0]));
-        }
-        return cmd.exec();
-    }
-
-    private void streamContainerLogs(String containerId) {
-        dockerClient.logContainerCmd(containerId)
-                .withStdOut(true)
-                .withStdErr(true)
-                .withFollowStream(true)
-                .exec(new com.github.dockerjava.api.async.ResultCallback.Adapter<Frame>() {
-                    @Override
-                    public void onNext(Frame frame) {
-                        log.info("[RUNNER LOG] {}", new String(frame.getPayload()));
-                    }
-                });
-    }
-
-    private void removeContainer(String containerId) {
-        dockerClient.removeContainerCmd(containerId)
-                .withForce(true)
-                .exec();
     }
 }

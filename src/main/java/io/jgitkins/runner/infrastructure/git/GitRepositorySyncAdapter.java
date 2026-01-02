@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 public class GitRepositorySyncAdapter implements RepositorySyncPort {
 
     @Override
-    public Path syncRepository(String repoUrl, String taskCd, String repoName, String ref) throws Exception {
+    public Path fetchRepository(String repoUrl, String taskCd, String repoName, String ref) throws Exception {
         Path workspace = Paths.get(WORK_SPACE_ROOT, taskCd, repoName);
         Files.createDirectories(workspace);
 

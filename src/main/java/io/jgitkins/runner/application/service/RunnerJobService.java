@@ -1,12 +1,12 @@
 package io.jgitkins.runner.application.service;
 
+import io.jgitkins.runner.application.mapper.JobResultStatusMapper;
 import io.jgitkins.runner.application.port.in.RunnerJobUseCase;
-import io.jgitkins.runner.application.port.out.ContainerRunnerPort;
 import io.jgitkins.runner.application.port.out.JobFetchPort;
-import io.jgitkins.runner.application.port.out.JobResultPort;
+import io.jgitkins.runner.application.port.out.JobResultReportPort;
+import io.jgitkins.runner.application.port.out.JobRunnerPort;
 import io.jgitkins.runner.application.port.out.RepositorySyncPort;
-import io.jgitkins.runner.domain.ExecutionResult;
-import io.jgitkins.runner.domain.JobStatus;
+import io.jgitkins.runner.application.dto.JobRunContext;
 import io.jgitkins.runner.domain.RunnerConfiguration;
 import io.jgitkins.server.grpc.JobPayload;
 import io.jgitkins.server.grpc.JobResultStatus;
@@ -24,9 +24,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class RunnerJobService implements RunnerJobUseCase {
 
     private final JobFetchPort jobFetchPort;
-    private final JobResultPort jobResultPort;
     private final RepositorySyncPort repositorySyncPort;
-    private final ContainerRunnerPort containerRunnerPort;
+    private final JobResultReportPort jobResultReportPort;
+    private final JobRunnerPort jobRunnerPort;
+
     private final RunnerInitService initService;
     private final AtomicBoolean jobInProgress = new AtomicBoolean(false);
 
@@ -53,30 +54,30 @@ public class RunnerJobService implements RunnerJobUseCase {
 
         try {
             log.info("Starting job {} for repository {}", payload.getJobId(), payload.getRepositoryId());
-            Path workspace = repositorySyncPort.syncRepository(payload.getCloneUrl(),
+            Path workspace = repositorySyncPort.fetchRepository(payload.getCloneUrl(),
                                                                Long.toString(payload.getJobId()),
                                                                Long.toString(payload.getRepositoryId()),
                                                                payload.getBranchName());
 
-            // TODO:
-            int exitCode = containerRunnerPort.run(workspace.toAbsolutePath().toString(),
-                                                   configuration.getRunnerImageName(),
-                                                   "TODO: ");
-            JobStatus jobStatus = exitCode == 0 ? JobStatus.SUCCESS : JobStatus.FAILURE;
+            JobRunContext context = JobRunContext.builder()
+                    .workspacePath(workspace.toAbsolutePath().toString())
+                    .runnerImageName(configuration.getRunnerImageName())
+                    .pluginPath(null) // TODO: plugin path
+                    .build();
+            int exitCode = jobRunnerPort.run(context);
 
-            log.info("jobStatus: [{}]", jobStatus);
-            ExecutionResult result = new ExecutionResult(jobStatus, exitCode);
-            JobResultStatus status = result.getStatus() == JobStatus.SUCCESS ? JobResultStatus.JOB_RESULT_SUCCESS
-                                                                             : JobResultStatus.JOB_RESULT_FAILED;
-            jobResultPort.reportResult(configuration, payload.getJobId(), status);
+            JobResultStatus status = JobResultStatusMapper.fromExitCode(exitCode);
+
+            log.info("jobStatus: [{}]", status);
+            jobResultReportPort.reportResult(configuration, payload.getJobId(), status);
 
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             log.error("Job {} interrupted", payload.getJobId(), ex);
-            jobResultPort.reportResult(configuration, payload.getJobId(), JobResultStatus.JOB_RESULT_FAILED);
+            jobResultReportPort.reportResult(configuration, payload.getJobId(), JobResultStatus.JOB_RESULT_FAILED);
         } catch (Exception ex) {
             log.error("Job {} execution failed due to unexpected error", payload.getJobId(), ex);
-            jobResultPort.reportResult(configuration, payload.getJobId(), JobResultStatus.JOB_RESULT_FAILED);
+            jobResultReportPort.reportResult(configuration, payload.getJobId(), JobResultStatus.JOB_RESULT_FAILED);
         } finally {
             jobInProgress.set(false);
         }

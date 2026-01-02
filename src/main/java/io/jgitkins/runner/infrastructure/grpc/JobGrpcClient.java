@@ -2,15 +2,12 @@ package io.jgitkins.runner.infrastructure.grpc;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import io.grpc.Metadata;
 import io.grpc.StatusRuntimeException;
-import io.grpc.stub.MetadataUtils;
 import io.jgitkins.runner.application.port.out.JobFetchPort;
-import io.jgitkins.runner.application.port.out.JobResultPort;
+import io.jgitkins.runner.application.port.out.JobResultReportPort;
 import io.jgitkins.runner.domain.RunnerConfiguration;
 import io.jgitkins.runner.infrastructure.helper.EndpointPaths;
-import io.jgitkins.runner.infrastructure.helper.RunnerRequestSignature;
-import io.jgitkins.runner.infrastructure.helper.RunnerRequestSigner;
+import io.jgitkins.runner.infrastructure.helper.GrpcSignatureHelper;
 import io.jgitkins.server.grpc.JobDispatchRequest;
 import io.jgitkins.server.grpc.JobDispatchResponse;
 import io.jgitkins.server.grpc.JobDispatchServiceGrpc;
@@ -26,14 +23,7 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-public class JobDispatchGrpcClient implements JobFetchPort, JobResultPort {
-
-    private static final Metadata.Key<String> HEADER_TIMESTAMP =
-            Metadata.Key.of("x-runner-timestamp", Metadata.ASCII_STRING_MARSHALLER);
-    private static final Metadata.Key<String> HEADER_NONCE =
-            Metadata.Key.of("x-runner-nonce", Metadata.ASCII_STRING_MARSHALLER);
-    private static final Metadata.Key<String> HEADER_SIGNATURE =
-            Metadata.Key.of("x-runner-signature", Metadata.ASCII_STRING_MARSHALLER);
+public class JobGrpcClient implements JobFetchPort, JobResultReportPort {
 
     private ManagedChannel channel;
     private JobDispatchServiceGrpc.JobDispatchServiceBlockingStub blockingStub;
@@ -119,12 +109,7 @@ public class JobDispatchGrpcClient implements JobFetchPort, JobResultPort {
         if (blockingStub == null) {
             return null;
         }
-        RunnerRequestSignature signature = RunnerRequestSigner.forGrpc(configuration.getRunnerToken(), path);
-        Metadata metadata = new Metadata();
-        metadata.put(HEADER_TIMESTAMP, signature.timestamp());
-        metadata.put(HEADER_NONCE, signature.nonce());
-        metadata.put(HEADER_SIGNATURE, signature.signature());
-        return blockingStub.withInterceptors(MetadataUtils.newAttachHeadersInterceptor(metadata));
+        return GrpcSignatureHelper.attach(blockingStub, configuration.getRunnerToken(), path);
     }
 
     private void shutdownChannel() {

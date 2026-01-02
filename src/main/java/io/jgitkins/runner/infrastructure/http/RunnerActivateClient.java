@@ -4,6 +4,7 @@ import io.jgitkins.runner.application.exception.RunnerRegistrationException;
 import io.jgitkins.runner.infrastructure.helper.ApiErrorMessageExtractor;
 import io.jgitkins.runner.infrastructure.helper.EndpointPaths;
 import io.jgitkins.runner.infrastructure.helper.RunnerActivationEndpointHelper;
+import io.jgitkins.runner.infrastructure.helper.RunnerHeaderNames;
 import io.jgitkins.runner.infrastructure.helper.RunnerRequestSignature;
 import io.jgitkins.runner.infrastructure.helper.RunnerRequestSigner;
 import io.jgitkins.runner.presentation.common.ApiResponse;
@@ -32,9 +33,9 @@ public class RunnerActivateClient {
                     .uri(endpoint)
                     .contentType(MediaType.APPLICATION_JSON)
                     .headers(headers -> {
-                        headers.add("X-Runner-Timestamp", signature.timestamp());
-                        headers.add("X-Runner-Nonce", signature.nonce());
-                        headers.add("X-Runner-Signature", signature.signature());
+                        headers.add(RunnerHeaderNames.TIMESTAMP, signature.timestamp());
+                        headers.add(RunnerHeaderNames.NONCE, signature.nonce());
+                        headers.add(RunnerHeaderNames.SIGNATURE, signature.signature());
                     })
                     .body(new RunnerActivationRequest(runnerToken))
                     .retrieve()
