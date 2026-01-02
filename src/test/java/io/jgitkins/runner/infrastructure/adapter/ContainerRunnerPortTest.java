@@ -1,12 +1,16 @@
 package io.jgitkins.runner.infrastructure.adapter;
 
 import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.core.DefaultDockerClientConfig;
+import com.github.dockerjava.core.DockerClientImpl;
+import com.github.dockerjava.okhttp.OkDockerHttpClient;
+import com.github.dockerjava.transport.DockerHttpClient;
 import io.jgitkins.runner.application.port.out.ContainerRunnerPort;
 import io.jgitkins.runner.application.port.out.RepositorySyncPort;
+import io.jgitkins.runner.infrastructure.git.GitRepositorySyncAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -19,7 +23,7 @@ import java.nio.file.Path;
 @Component
 @Primary
 @Profile("test")
-@SpringBootTest
+//@SpringBootTest
 public class ContainerRunnerPortTest {
 
     @Autowired
@@ -31,6 +35,19 @@ public class ContainerRunnerPortTest {
 
     @BeforeEach
     void setUp() {
+        repositorySyncPort = new GitRepositorySyncAdapter();
+        DefaultDockerClientConfig config = DefaultDockerClientConfig
+                .createDefaultConfigBuilder()
+                .withDockerHost("unix:///var/run/docker.sock")
+                .build();
+
+        DockerHttpClient httpClient = new OkDockerHttpClient.Builder()
+                .dockerHost(config.getDockerHost())
+                .sslConfig(config.getSSLConfig())
+                .build();
+
+        dockerClient = DockerClientImpl.getInstance(config, httpClient);
+
         containerRunnerPort = new DockerRunnerAdapter(dockerClient);
     }
 
