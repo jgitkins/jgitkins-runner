@@ -2,7 +2,10 @@ package io.jgitkins.runner.infrastructure.http;
 
 import io.jgitkins.runner.application.exception.RunnerRegistrationException;
 import io.jgitkins.runner.infrastructure.helper.ApiErrorMessageExtractor;
+import io.jgitkins.runner.infrastructure.helper.EndpointPaths;
 import io.jgitkins.runner.infrastructure.helper.RunnerActivationEndpointHelper;
+import io.jgitkins.runner.infrastructure.helper.RunnerRequestSignature;
+import io.jgitkins.runner.infrastructure.helper.RunnerRequestSigner;
 import io.jgitkins.runner.presentation.common.ApiResponse;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -24,9 +27,15 @@ public class RunnerActivateClient {
     public ActivationResult activateRunner(String runnerToken, String baseUrl) {
         try {
             String endpoint = RunnerActivationEndpointHelper.build(baseUrl);
+            RunnerRequestSignature signature = RunnerRequestSigner.forHttp(runnerToken, "POST", EndpointPaths.Rest.ACTIVATE);
             ApiResponse<ActivationResult> body = restClient.post()
                     .uri(endpoint)
                     .contentType(MediaType.APPLICATION_JSON)
+                    .headers(headers -> {
+                        headers.add("X-Runner-Timestamp", signature.timestamp());
+                        headers.add("X-Runner-Nonce", signature.nonce());
+                        headers.add("X-Runner-Signature", signature.signature());
+                    })
                     .body(new RunnerActivationRequest(runnerToken))
                     .retrieve()
                     .body(new ParameterizedTypeReference<>() {});
