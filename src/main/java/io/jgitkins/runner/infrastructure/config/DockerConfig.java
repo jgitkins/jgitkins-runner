@@ -13,14 +13,11 @@ public class DockerConfig {
 
     @Bean
     public DockerClient dockerClient() {
-//        DefaultDockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
-
 
         DefaultDockerClientConfig config = DefaultDockerClientConfig
                 .createDefaultConfigBuilder()
                 .withDockerHost("unix:///var/run/docker.sock")
                 .build();
-
 
         DockerHttpClient httpClient = new OkDockerHttpClient.Builder()
                 .dockerHost(config.getDockerHost())
