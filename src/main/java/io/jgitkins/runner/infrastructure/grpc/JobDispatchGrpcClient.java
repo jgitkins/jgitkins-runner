@@ -50,7 +50,7 @@ public class JobDispatchGrpcClient implements JobFetchPort, JobResultPort {
             }
             return Optional.empty();
         } catch (StatusRuntimeException e) {
-            log.error("Job request failed", e);
+            log.error("Job request failed message: [{}]", e.getMessage());
             return Optional.empty();
         }
     }
