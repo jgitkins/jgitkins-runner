@@ -1,25 +1,23 @@
 package io.jgitkins.runner.application.exception;
 
-import org.springframework.http.HttpStatus;
-
 /**
  * Signals that runner activation/registration with the server failed.
  */
 public class RunnerRegistrationException extends RuntimeException {
 
-    private final HttpStatus status;
+    private final int statusCode;
 
-    public RunnerRegistrationException(HttpStatus status, String message) {
+    public RunnerRegistrationException(int statusCode, String message) {
         super(message);
-        this.status = status;
+        this.statusCode = statusCode;
     }
 
-    public RunnerRegistrationException(HttpStatus status, String message, Throwable cause) {
+    public RunnerRegistrationException(int statusCode, String message, Throwable cause) {
         super(message, cause);
-        this.status = status;
+        this.statusCode = statusCode;
     }
 
-    public HttpStatus getStatus() {
-        return status;
+    public int getStatusCode() {
+        return statusCode;
     }
 }

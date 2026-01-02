@@ -12,7 +12,7 @@ import java.time.Duration;
 import org.springframework.stereotype.Component;
 
 @Component
-public class RunnerConfigurationResponseMapper {
+public class RunnerConfigurationMapper {
 
     public RunnerConfiguration toDomain(ActivationResult response, String runnerToken, String overrideBaseUrl) {
         RunnerRuntimeConfig runtime = toRuntimeConfig(response.runtimeConfig(), runnerToken, overrideBaseUrl);

@@ -4,5 +4,5 @@ import io.jgitkins.runner.domain.RunnerConfiguration;
 
 public interface RunnerActivatePort {
 
-    RunnerConfiguration activateRunner(String runnerToken, String runnerName);
+    RunnerConfiguration activateRunner(String runnerToken, String baseUrl);
 }
